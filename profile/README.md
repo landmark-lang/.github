@@ -84,7 +84,7 @@ fn moveInto(arg: mut Ref<int32>) {
 }
 
 let mut stringRef = Ref<string>::from("Initial value");
-let mut intRef = Ref<int32>::from(0i32);
+let mut intRef = Ref<int>::from(0);
 let string1 = stringRef.deref();
 let int1 = intRef.deref();
 
@@ -112,13 +112,13 @@ As you would notice from the code above, the behavior of a references to a class
 ## The `Lifetime` type
 I know I said Landmark is heavily inspired by Rust in most of its semantics and that's true for the most bit. I'd try to talk about lifetimes in Landmark without getting too much into the details of how memory is managed in Landmark. In Landmark, lifetimes are treated like a '__value__' and not information.
 
-This means that it can be passed around as an argument between functions and required as parameters for functions. On this note, the standard library functions for allocating memory in Landmark require a lifetime as an argument. In Landmark, lifetimes can have 3 possible literal values: `$static`, `$object`, and `$local`.
+This means that it can be passed around as an argument between functions and required as parameters for functions. On this note, the standard library functions for allocating memory in Landmark require a lifetime as an argument. In Landmark, lifetimes can have 3 possible literal values: `__static`, `__object`, and `__local`.
 
-The `$static` lifetime is equivalent to the `'static` lifetime annotation in Rust. Any memory allocated with this lifetime would last for the entire runtime of the program and would only be freed when the program is terminated.
+The `__static` lifetime is equivalent to the `'static` lifetime annotation in Rust. Any memory allocated with this lifetime would last for the entire runtime of the program and would only be freed when the program is terminated.
 
-The `$local` lifetime is only valid within a function and represents the lifetime associated with a single invocation of the function. It does not carry over between invocations of the same function. This lifetime is deallocated right before the function returns to its caller.
+The `__local` lifetime is only valid within a function and represents the lifetime associated with a single invocation of the function. It does not carry over between invocations of the same function. This lifetime is deallocated right before the function returns to its caller.
 
-The `$object` lifetime is only valid within an instance class method. It represents the lifetime of the `this` object or the "__current instance__" of the class you are working on. When the object is deallocated, any object that was bound to its lifetime would be deallocated too.
+The `__object` lifetime is only valid within an instance class method. It represents the lifetime of the `this` object or the "__current instance__" of the class you are working on. When the object is deallocated, any object that was bound to its lifetime would be deallocated too.
 
 When a `Lifetime` is due to get deallocated, we say it has gone out of scope. When a `Lifetime` gets deallocated, all objects and chunks of memory allocated in reference to it would be deleted. No reference counting included. For this reason, there are functions in the standard library that allow you move a reference to another lifetime.
 
@@ -146,6 +146,135 @@ let myFn = fn(foundation: string, number: int32): string {
 ```
 
 It is worth noting that in Landmark, there is no such thing as a closure capturing any values from the scope outside of it. At least, for now. Maybe I might include one in the future, who knows?
+
+# Managing memory in Landmark
+In Landmark, memory is logically grouped into lifetimes. Now, we've talked about most of this when we were analyzing the `Lifetime` type so I would avoid repeating some of the things I already said there before. To think about memory in Landmark, we must first think of a program as a collection of two types of procedures:
+
+1. Procedures that yield results.
+2. Procedures that yield no results.
+
+
+## Procedures that yield no results
+These are functions that have no return type annotated on them. They are compiled to have the `void` return type in C. There are no magic lifetime parameters in such functions. We can therefore say that the lifetimes of these functions is self-contained within the functions.
+
+For this class of functions, the lifetime of any piece of memory allocated within them would be `__local` to that given invocation. Meaning all class objects, and references that were generated inside of this function would be cleaned up right before this function returns to its caller.
+
+To give an example below, let's consider a function that allocates a new object of type `Map<string, string>` from the heap and adds a single entry to it then returns to its caller.
+
+```rs
+fn useMap() {
+	let mapRef: Ref<Map<string, string>> = new<Map<string, string>>(__local);
+	let map = mapRef.deref();
+
+	// Now do something to the map.
+	map["message"] = "Hello World!";
+}
+```
+
+Would be something similar to the code you have below after being compiled to C
+
+```c
+void useMap() {
+	struct Lifetime* __local = $___lmk_lifetime_new();
+	struct type_xxxx* mapRef = new$xxxx(__local);
+	struct type_xxxx* map = fn_xxxx_deref(mapRef);
+
+	// Now do something to the map.
+	fn_xxxx_set(map, $__lmk_make_str(__local, "message", 7), $__lmk_make_str(__local, "Hello World!", 12));
+
+	// Now, destroy this lifetime.
+	$___lmk_lifetime_destroy(__local);
+}
+```
+
+## Procedures that yield results
+These are functions that have an annotated return type. There is a magical lifetime parameter bound to such functions. This parameter is where the lifetime of the topmost function scope from this procedure that yields a result.
+
+Let's examine some Landmark code below to attempt to illustrate this example below:
+
+```rs
+fn makeMap(): Map<string, string> {
+	return new<Map<string, string>>(__local).deref();
+}
+
+
+fn useMapToChange(): boolean {
+	// This is fine.
+	let mut map = makeMap();
+
+	// Fair enough.
+	map["getter"] = "Getter";
+
+	// Either this one, or that one.
+	return true;
+}
+
+fn doItAll() {
+	// If this is not the case...
+	if !useMapToChange() {
+		panic("The universe has imploded.");
+	}
+}
+
+fn main(env: mut Environment) {
+	doItAll(); // Just call this directly.
+}
+```
+
+
+This would transform to code that looks more like this in C:
+
+```c
+struct type_xxxx* makeMap(struct Lifetime* __local) {
+	return fn_xxxx_deref(new$xxxx(__local));
+}
+
+bool useMapToChange(struct Lifetime* __local) {
+	// This is fine.
+	struct type_xxxx* map = makeMap(__local);
+
+	// Set this here.
+	fn_xxxx_set(map, $__lmk_make_str(__local, "getter", 6), $__lmk_make_str(__local, "Getter", 6));
+
+	// Then do this.
+	return 1;
+}
+
+void doItAll() {
+	// This is fine.
+	struct Lifetime* __local = $___lmk_lifetime_new();
+
+	// This is fair enough.
+	if(!useMapToChange(__local)) {
+		panic($__lmk_make_str(__local, "The universe has imploded", 25));
+	}
+
+	// Destroy this scope.
+	$___lmk_lifetime_destroy(__local);
+}
+
+void main(struct type_yyyy* env) {
+	// This is also fine.
+	struct Lifetime* __local = $___lmk_lifetime_new();
+
+	// Then call the function.
+	doItAll();
+
+	// This is fine.
+	$___lmk_lifetime_destroy(__local);
+}
+```
+
+If you could read and understand what was going on in the C version of the code, you'd quickly notice that the `Map<string, string>` that is created in the `makeMap` function does not get deallocated until the function `doItAll` returns to its caller — `main`. This is exactly the kind of behavior we were talking about.
+
+The one that makes sure that the moment it is inconceivable for any piece of memory to still be referenced by any code, we drop it. This way memory is only freed at the point where we are sure it no longer has any reason to be allocated.
+
+## There's a problem though
+Yes, there is a problem though that this method of managing memory introduces and I acknowledge it. The moment you, by unfortunate coincidence, have a chain of functions that return a result to their caller and that chain goes all the way up to main, you effectively never free any memory until your program is terminated.
+
+It was because I noticed this issue that I added another method of managing memory to Landmark. Just free it yourself. There's a function in Landmark called `dealloc` which does just that. This function HOWEVER only operates on reference types because they are the only types primitive to Landmark which can represent a contiguous allocation of memory.
+
+The `dealloc` function would get the lifetime of the chunk of memory you wish to free from its runtime reference. After getting the lifetime, it removes the chunk of memory you are freeing from the said lifetime. It is worth noting though that the `dealloc` function's full signature looks something like `fn dealloc(mem: any)` which implies that you HAVE to cast the reference to an `any` type before passing it to the dealloc function.
 
 <!--
 # Getting Started with Landmark

@@ -59,7 +59,93 @@ The second "object" type we have in Landmark is the `base` type. A base is simil
 The third "object" type in Landmark is an `enum`. It represents any type in Landmark which contains a finite number of possible values which are simple enough that they can be represented as numbers (by the Landmark compiler). Much like in Rust, Landmark enums can also have instance functions. Unlike Rust however, the variant values in a Landmark enum do not contain any data.
 
 ## The `reference` types
-In Landmark, there are 
+In Landmark, there are 3 reference types: the `any` type, the `ByteArray` type, and the `Ref<type T>` type. We've already talked about the `ByteArray` type before so we would not be covering it here anymore. For that reason, let's look at the `any` type first.
+
+Unlike the very misleading name, the `any` type actually cannot contain a value or memory of <span style="color: #f02020">__any__</span> type. It just represents a pointer to a chunk of memory. In fact, undef the hood, it is directly just the C `void*` type. To make working with them easier in Landmark, the only types that can casted to and from this type are other reference types.
+
+This means that to cast to and from the `any` type, you need to obtain the reference of the value first. To do that in Landmark, you would use the `Ref` class which brings us to the next reference type. The `Ref<type T>` type is really just a pointer. It is only a handy way of dealing with pointers with one dimension of abstraction. The `Ref<T>` type was created to make working with pointers a lot easier and for that reason, there are some rules that this type imposes for its use:
+
+1. You can never build a `Ref` to another reference type. This means that not only is something like a `Ref<Ref<int>>` banned but something like `Ref<any>` or `Ref<ByteArray>` is banned too.
+2. If a `Ref` is no longer valid and you attempt to access it, it would throw an error that CANNOT be "caught."
+3. To obtain a reference to a value type (numerical, boolean, tuple, or enum types), you MUST use the `Ref::copy` function. You cannot obtain a reference to a value of any of the highlighted types with the `Ref::to` function.
+4. To obtain the reference of a class object, you MUST use the `Ref::of` function. You cannot obtain a value to a class object using the `Ref::copy` function. If you want to duplicate a reference to a class object, you use the `Ref.clone` function.
+5. You cannot obtain the reference to a lifetime, function or variable that has a functional type.
+6. When working with references of value types, much different from class objects, direct mutation is not possible. To store any changed values inside of the reference, you must use the `Ref.update` function.
+
+Let's attach a simple example of how to use the reference type and the different situations you encounter it in below.
+
+```rust
+fn moveInto(arg: mut Ref<string>) {
+	arg.update("Hello World");
+}
+
+fn moveInto(arg: mut Ref<int32>) {
+	arg.update(1337);
+}
+
+let mut stringRef = Ref<string>::from("Initial value");
+let mut intRef = Ref<int32>::from(0i32);
+let string1 = stringRef.deref();
+let int1 = intRef.deref();
+
+// Now, mutate this reference.
+moveInto(mut stringRef);
+moveInto(mut intRef);
+
+// Next, do something strange.
+let string2 = stringRef.deref();
+let int2 = intRef.deref();
+
+// If these two strings do not have an equal value...
+if string1 != string2 {
+	panic("The two strings should have identical values at this point in time.");
+}
+
+// If these two are equal values, then everything has gone to s**t.
+if int1 == int2 {
+	panic("This makes no sense because the two numbers should have different values right now.");
+}
+```
+
+As you would notice from the code above, the behavior of a references to a class object is identical to the behavior of pointers in C or any other systems programming language. However with the reference to a value type, the moment you dereference it, it loses any connection to the reference it originated from.
+
+## The `Lifetime` type
+I know I said Landmark is heavily inspired by Rust in most of its semantics and that's true for the most bit. I'd try to talk about lifetimes in Landmark without getting too much into the details of how memory is managed in Landmark. In Landmark, lifetimes are treated like a '__value__' and not information.
+
+This means that it can be passed around as an argument between functions and required as parameters for functions. On this note, the standard library functions for allocating memory in Landmark require a lifetime as an argument. In Landmark, lifetimes can have 3 possible literal values: `$static`, `$object`, and `$local`.
+
+The `$static` lifetime is equivalent to the `'static` lifetime annotation in Rust. Any memory allocated with this lifetime would last for the entire runtime of the program and would only be freed when the program is terminated.
+
+The `$local` lifetime is only valid within a function and represents the lifetime associated with a single invocation of the function. It does not carry over between invocations of the same function. This lifetime is deallocated right before the function returns to its caller.
+
+The `$object` lifetime is only valid within an instance class method. It represents the lifetime of the `this` object or the "__current instance__" of the class you are working on. When the object is deallocated, any object that was bound to its lifetime would be deallocated too.
+
+When a `Lifetime` is due to get deallocated, we say it has gone out of scope. When a `Lifetime` gets deallocated, all objects and chunks of memory allocated in reference to it would be deleted. No reference counting included. For this reason, there are functions in the standard library that allow you move a reference to another lifetime.
+
+## The `functional` types
+In Landmark, functions can also be treated as a value which gave reason to functional types. To declare a variable with a functional type in Landmark, you use the syntax below:
+
+```rust
+let fnValue: fn(string, int32) -> string;
+```
+
+Following what you see above, you can split this into two parts:
+1. The parametric information of the functional type.
+2. The return type information of the functional type.
+
+The parametric information is what gives the compiler information about the inputs of the function. In the example above, the parametric information is `fn(string, int32)` which means that this is a function that __consumes__ a string, and a 32-bit integer.
+
+The return type information is what gives the compiler information about the output of a function. In the example above, the return type information is `-> string`. It can be interpreted loosely as "gives a string as output." When the return type information is omitted in a functional type, it means that the value function DOES not return a value. In C terms, that means the return type is `void`.
+
+To create a value function in Landmark, you use the syntax shown below:
+
+```rs
+let myFn = fn(foundation: string, number: int32): string {
+	return foundation + number;
+}
+```
+
+It is worth noting that in Landmark, there is no such thing as a closure capturing any values from the scope outside of it. At least, for now. Maybe I might include one in the future, who knows?
 
 <!--
 # Getting Started with Landmark

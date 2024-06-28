@@ -1,7 +1,7 @@
 # General 
 Don't think of this as a regular ol' README file. Think of it like a happy child's Journal. This is an informative publication about the Landmark programming language and my the process and design choices while I was building it. Also, far below — after all of my chaotic thoughts — you'd be reading here, you would find documentation containing some snippets of Landmark code and others containing how to get started with using Landmark. After that description you might think of this as a whitepaper and that's wrong for three reasons:
 
-1. Meh, you can argue that there's barely a problem I am trying to solve that another language which exists already does not solve. Although, I would talk about a few problems and the way Landmark tries to solve or sometimes even solves them.
+1. Meh, you can argue that there's barely a problem I am trying to solve that another language which exists already does not solve. Although, I would talk about a few problems and the way Landmark tries to solve, or sometimes even solves, them.
 2. Err... the pilot version of the compiler is written in Golang. No matter what reason sophisticated enough that I try to come up with, the tool would defeat this reason.
 3. It's kind of weird calling it whitepaper when basically anybody reading this would read it in dark mode.
 
@@ -21,14 +21,14 @@ Unlike the previous paragraph might lead you to believe, there is only one boole
 ## The `numerical` types
 In Landmark there are two families of numerical types: the [`integer`](https://www.freecodecamp.org/news/integer-definition/) types and the [`floating-point`](https://www.freecodecamp.org/news/floating-point-definition/) types. There are 9 `integer` types in Landmark which are `byte`, `int`, `uint`, `int16`, `uint16`, `int32`, `uint32`, `int64`, and `uint64`.
 
-A `byte` is 8 bits wide. The `int` and `uint` types are one processor word wide, and this essentially means they'd be 64 bits wide on 64-bit machines and 32 bits wide on 32-bit machines. For the other integer types, their width is appending to their tail end. This means the `int16` and `uint16` types are 16 bits wide. In a like manner, any numerical type that is prefixed with the letter 'u' is [`unsigned`](https://www.thoughtco.com/definition-of-unsigned-958174).
+A `byte` is 8 bits wide. The `int` and `uint` types are one processor word wide, and this essentially means they'd be 64 bits wide on 64-bit machines and 32 bits wide on 32-bit machines. For the other integer types, their width is appended to their tail end. This means the `int16` and `uint16` types are 16 bits wide. In a like manner, any numerical type that is prefixed with the letter 'u' is [`unsigned`](https://www.thoughtco.com/definition-of-unsigned-958174).
     
 In Landmark, there are only 2 number types floating-point numbers: `float32` and `float64`. A `float32` is a floating-point number that is 32 bits wide and in a like manner, a `float64` is a floating-point number that is 64 bits wide.
 
 ## The `text` types
 In Landmark, there is only one real text type and that is a `string`. It is an `object` type which which means it provides one dimension of abstraction over the lower-level pitfalls typically associated with strings. Every usage of a string including string literals in Landmark, use the `string` type. This was done to simplify the developer experience. By the way, all strings in Landmark are encoded in UTF-8 by default. Strings in Landmark are composed using the `byte` type. A byte literal is a character literal and it is a valid character representation that is surrounded with the ' character.
 
-There's another reference type that behaves like and can be used to compose a string which is a `ByteArray`. A `ByteArray` is a raw contiguous block of memory that represents a UTF-8 encoded string of `byte`s. It is typically always null-terminated whenever any API requires you to use it directly. Like they sound, these are C-type strings. You'd probably never have any reason to ever use them directly because they come with a foot-gun or two.
+There's another reference type that behaves like and can be used to compose a string which is a `ByteArray`. A `ByteArray` is a raw contiguous block of memory that represents a UTF-8 encoded string of `byte`s. It is typically always null-terminated whenever any API requires you to use it directly. Like they sound, these are C-type strings. You'd probably never have any reason to ever use them directly because they come with a foot-gun or two and the overhead of actually having to count the number of characters in the string.
 
 About how to declare string values in Landmark, there are 2 ways: using the \` character as the delimiter or using the " character as the delimiter. When the string is surrounded with the \` character, it is a raw string. This means that every white space character in the string would be printed out exactly how it looks. When the string is surrounded with the " character, every run of whitespace characters would be collapsed to a single space. Like this implies, all strings in Landmark are intrinsically multiline by behavior.
 
